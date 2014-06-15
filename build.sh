@@ -1,6 +1,6 @@
 #!/bin/bash
 set -e
-export ANDROID_NDK_ROOT=$PWD/../android-ndk-r9d
+export ANDROID_NDK_ROOT=~/Tools/android-ndk-r9d
 
 # arm or x86
 export ARCH=${1-arm}
@@ -19,6 +19,9 @@ export PREFIX=${BUILDROOT}/ndk-$ARCH/sysroot/usr
 export PKG_CONFIG_PATH=${PREFIX}/lib/pkgconfig
 export CC=${BUILDCHAIN}-gcc
 export CXX=${BUILDCHAIN}-g++
+
+export ac_cv_func_malloc_0_nonnull=yes
+export ac_cv_func_realloc_0_nonnull=yes
 
 # Fetch external repos
 if [ ! -e pulseaudio ] || [ ! -e json-c ] || [ ! -e libtool ] ; then
@@ -45,10 +48,12 @@ if [ ! -e $PKG_CONFIG_PATH/json-c.pc ] ; then
 	pushd json-c
 	autoreconf -i
 	aclocal --system-acdir=${PREFIX}/share/aclocal
+        $LIBTOOLIZE -f -i
+        automake --add-missing
 	popd
 	mkdir -p json-c-build
 	pushd json-c-build
-	../json-c/configure --host=${BUILDCHAIN} --prefix=${PREFIX}
+	LIBS="-lm" ../json-c/configure --host=${BUILDCHAIN} --prefix=${PREFIX}
 	make
 	make install
 	popd
@@ -62,11 +67,14 @@ if [ ! -e libsndfile-1.0.25 ] ; then
 fi
 if [ ! -e $PKG_CONFIG_PATH/sndfile.pc ] ; then
 	pushd libsndfile-1.0.25
-	cp ../json-c/config.sub Cfg/
+        #aclocal --system-acdir=${PREFIX}/share/aclocal
+        #$LIBTOOLIZE -f -i
+	cp -f ../json-c/config.sub Cfg/ ||:
 	popd
 	mkdir -p libsndfile-build
 	pushd libsndfile-build
 	../libsndfile-1.0.25/configure --host=${BUILDCHAIN} --prefix=${PREFIX} --disable-external-libs --disable-alsa --disable-sqlite
+        sed -i 's/\(soname_spec.*\)\\$major/\1/g' libtool
 	make ||:
 	make install ||:
 	cp sndfile.pc ${PREFIX}/lib/pkgconfig/
